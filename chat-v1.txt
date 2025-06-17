@@ -1,0 +1,1293 @@
+
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+file thumbnail
+unit_profile_view.txt
+1,951 tokens
+file thumbnail
+‏‏unit_profile_view.txt
+1,953 tokens
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+image.png
+فكرة ممتازة جدًا وحيوية لنجاح نظام الفروع.
+أنت على حق تمامًا. في نظام متعدد الكيانات، لا يمكن الاعتماد على رقم تسلسلي واحد لجميع الفروع، لأن هذا سيسبب تضاربًا وفوضى. يجب أن يكون لكل فرع سلسلة ترقيم مستقلة وخاصة به.
+هذه الميزة تضيف طبقة من الاحترافية والمنطقية للنظام.
+كيفية تطبيق الترقيم المستقل لكل فرع:
+لن نغير حقل id الرئيسي في الجداول، فهو سيبقى الرقم الفريد على مستوى قاعدة البيانات كلها (Primary Key). بدلاً من ذلك، سنضيف حقلًا جديدًا "للرقم المعروض" أو "الرقم المرجعي" في كل جدول يحتاج إلى ترقيم مستقل.
+دعنا نأخذ سندات القبض (جدول transactions) كمثال لتوضيح الفكرة.
+المرحلة الأولى: تعديل قاعدة البيانات
+جدول transactions: سنضيف له حقلين جديدين:
+branch_id: لربط كل حركة مالية بالفرع الذي تمت فيه.
+transaction_ref_no: هذا هو الحقل الذي سيحمل الرقم التسلسلي المستقل (مثل 100, 101, 102) الخاص بكل فرع.
+استعلام SQL للتنفيذ:
+ALTER TABLE `transactions` 
+ADD `branch_id` INT(11) NULL AFTER `id`,
+ADD `transaction_ref_no` INT(11) NULL AFTER `branch_id`;
+
+-- إضافة فهرس لتحسين أداء البحث
+ALTER TABLE `transactions` ADD INDEX `idx_branch_ref` (`branch_id`, `transaction_ref_no`);
+Use code with caution.
+SQL
+جدول branches: سنضيف له حقولًا لتخزين آخر رقم تم استخدامه لكل نوع من المستندات. هذا هو "العداد" الخاص بكل فرع.
+استعلام SQL للتنفيذ:
+ALTER TABLE `branches`
+ADD `last_receipt_no` INT(11) NOT NULL DEFAULT 0,
+ADD `last_payment_no` INT(11) NOT NULL DEFAULT 0,
+ADD `last_invoice_no` INT(11) NOT NULL DEFAULT 0;
+-- يمكن إضافة عدادات أخرى هنا مستقبلاً (مثل عقود، عملاء، إلخ)
+Use code with caution.
+SQL
+المرحلة الثانية: تعديل منطق البرمجة (مثال: سند القبض)
+هنا يكمن العمل الحقيقي. عندما يقوم المستخدم بإنشاء "سند قبض" جديد، سيحدث التالي خلف الكواليس:
+تحديد الفرع: النظام سيحدد الفرع الذي تتم فيه العملية. في حالة سند القبض، سيتم تحديد الفرع من العقد المرتبط بالدفعة. (العقد يرث الفرع من العقار).
+قفل الجدول (Transaction): لبدء عملية آمنة ومنع أي مستخدم آخر من أخذ نفس الرقم في نفس اللحظة، سنبدأ Transaction في قاعدة البيانات.
+جلب آخر رقم: نقوم بجلب قيمة last_receipt_no من جدول branches للفرع المحدد.
+زيادة الرقم: نقوم بزيادة الرقم بمقدار 1. (مثلاً: 100 -> 101).
+تحديث العداد: نقوم بتحديث قيمة last_receipt_no في جدول branches بالرقم الجديد (101).
+حفظ سند القبض: نقوم بإنشاء سجل جديد في جدول transactions ونضع الرقم الجديد (101) في حقل transaction_ref_no مع branch_id الصحيح.
+تأكيد العملية (Commit): إذا نجحت كل الخطوات، نؤكد العملية. إذا فشلت أي خطوة، نقوم بالتراجع (Rollback) لضمان عدم حدوث فوضى في الأرقام.
+مثال كود مبسط في index.php (داخل معالج سند القبض):
+// ... (بعد التحقق من الصلاحيات)
+try {
+    $pdo->beginTransaction();
+
+    // 1. تحديد الفرع (مثلاً من العقد)
+    $stmt_branch = $pdo->prepare("SELECT p.branch_id FROM properties p JOIN units u ON p.id = u.property_id JOIN contract_units cu ON u.id = cu.unit_id WHERE cu.contract_id = ? LIMIT 1");
+    $stmt_branch->execute([$contract_id]);
+    $branch_id = $stmt_branch->fetchColumn();
+
+    if (!$branch_id) {
+        throw new Exception("لا يمكن تحديد الفرع المرتبط بهذا العقد.");
+    }
+
+    // 2. جلب آخر رقم وزيادته
+    $stmt_last_no = $pdo->prepare("SELECT last_receipt_no FROM branches WHERE id = ? FOR UPDATE");
+    $stmt_last_no->execute([$branch_id]);
+    $last_no = $stmt_last_no->fetchColumn();
+    $new_ref_no = $last_no + 1;
+
+    // 3. تحديث العداد في جدول الفروع
+    $stmt_update_counter = $pdo->prepare("UPDATE branches SET last_receipt_no = ? WHERE id = ?");
+    $stmt_update_counter->execute([$new_ref_no, $branch_id]);
+
+    // 4. حفظ سند القبض مع الرقم المرجعي الجديد
+    $sql_trans = "INSERT INTO transactions (branch_id, transaction_ref_no, ...) VALUES (?, ?, ...)";
+    $stmt_trans = $pdo->prepare($sql_trans);
+    $stmt_trans->execute([$branch_id, $new_ref_no, ...]);
+
+    $pdo->commit();
+    $response = ['success' => true];
+
+} catch (Exception $e) {
+    $pdo->rollBack();
+    $response['message'] = $e->getMessage();
+}
+Use code with caution.
+PHP
+الخلاصة:
+فكرتك صحيحة 100% وهي قابلة للتطبيق. هي تتطلب:
+تعديلات هيكلية: إضافة حقول جديدة للجداول.
+تعديلات برمجية: تطبيق منطق Transaction لجلب الرقم وزيادته وتحديثه بأمان.
+هذه الميزة يمكن تطبيقها على كل الموديلات التي تحتاج ترقيمًا مستقلاً (عقود، عملاء، موردين، فواتير، ...إلخ) بنفس الآلية.
+ممتاز. الخطوة الأخيرة الآن هي تحديث واجهة عرض الموردين (suppliers_view.php) لتكتمل الميزة.
+خطة العمل: تحديث suppliers_view.php
+سنقوم بتعديل الملف ليقوم بالآتي:
+الربط مع جدول الفروع لجلب البيانات.
+إضافة فلتر للفرز حسب الفرع.
+إضافة عمود جديد في الجدول يعرض عدد الفروع المرتبطة (مع زر لفتح Modal بالتفاصيل).
+إنشاء قالب Modal لعرض تفاصيل الفروع.
+الخطوة الأولى: تحديث جزء PHP في suppliers_view.php
+افتح ملف src/modules/suppliers/suppliers_view.php.
+استبدل كل كود PHP الموجود في بداية الملف بهذا الكود الجديد والمطور:
+<?php
+// =================================================================
+// 1. إعدادات الترقيم والفلترة
+// =================================================================
+$records_per_page_options = [10, 25, 50, 100];
+$default_records_per_page = 10;
+
+$filter_q = $_GET['q'] ?? null;
+$filter_service = $_GET['service'] ?? null;
+$filter_status = $_GET['status'] ?? null;
+$filter_type = $_GET['type'] ?? null;
+$filter_branch_id = $_GET['branch_id'] ?? null; // <-- جديد: فلتر الفرع
+$limit = isset($_GET['limit']) && in_array($_GET['limit'], $records_per_page_options) ? (int)$_GET['limit'] : $default_records_per_page;
+$current_page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
+$offset = ($current_page - 1) * $limit;
+
+// جلب أنواع الخدمات والفروع للفلترة
+$service_types_stmt = $pdo->query("SELECT DISTINCT service_type FROM suppliers WHERE deleted_at IS NULL AND service_type IS NOT NULL AND service_type != '' ORDER BY service_type ASC");
+$service_types_for_filter = $service_types_stmt->fetchAll(PDO::FETCH_COLUMN);
+$branches_for_filter_stmt = $pdo->query("SELECT id, branch_name FROM branches WHERE deleted_at IS NULL ORDER BY branch_name ASC");
+$branches_for_filter = $branches_for_filter_stmt->fetchAll();
+
+// =================================================================
+// 2. بناء الاستعلام الديناميكي
+// =================================================================
+$sql_where = " WHERE s.deleted_at IS NULL ";
+$params = [];
+
+if (!empty($filter_q)) {
+    $search_term = '%' . $filter_q . '%';
+    $sql_where .= " AND (s.supplier_name LIKE ? OR s.registration_number LIKE ? OR s.tax_number LIKE ? OR s.mobile LIKE ?) ";
+    array_push($params, $search_term, $search_term, $search_term, $search_term);
+}
+if (!empty($filter_service)) { $sql_where .= " AND s.service_type = ? "; $params[] = $filter_service; }
+if (!empty($filter_status)) { $sql_where .= " AND s.status = ? "; $params[] = $filter_status; }
+if (!empty($filter_type)) { $sql_where .= " AND s.supplier_type = ? "; $params[] = $filter_type; }
+if (!empty($filter_branch_id)) {
+    $sql_where .= " AND s.id IN (SELECT supplier_id FROM supplier_branches WHERE branch_id = ?) ";
+    $params[] = $filter_branch_id;
+}
+
+// =================================================================
+// 3. حساب الإحصائيات والإجمالي
+// =================================================================
+$stats_sql = "
+    SELECT COUNT(s.id) AS total_count,
+        SUM(CASE WHEN s.supplier_type = 'فرد' THEN 1 ELSE 0 END) AS individual_count,
+        SUM(CASE WHEN s.supplier_type = 'منشأة' THEN 1 ELSE 0 END) AS company_count,
+        SUM(CASE WHEN s.status = 'نشط' THEN 1 ELSE 0 END) AS active_count
+    FROM suppliers s
+    {$sql_where}
+";
+$stats_stmt = $pdo->prepare($stats_sql);
+$stats_stmt->execute($params);
+$stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+
+$total_records = $stats['total_count'] ?? 0;
+$total_pages = ceil($total_records / $limit);
+
+// =================================================================
+// 4. جلب سجلات الصفحة الحالية
+// =================================================================
+$data_sql = "
+    SELECT 
+        s.*,
+        (SELECT COUNT(*) FROM contracts_supply cs WHERE cs.supplier_id = s.id AND cs.deleted_at IS NULL) as contracts_count,
+        (SELECT COUNT(*) FROM supplier_branches sb WHERE sb.supplier_id = s.id) as branch_count
+    FROM suppliers s
+    {$sql_where}
+    ORDER BY s.id DESC 
+    LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+
+$data_stmt = $pdo->prepare($data_sql);
+$data_stmt->execute($params);
+$suppliers = $data_stmt->fetchAll();
+
+$status_colors = ['نشط' => 'success', 'ملغي' => 'danger'];
+?>
+Use code with caution.
+PHP
+الخطوة الثانية: تحديث واجهة HTML في suppliers_view.php
+تحديث نموذج الفرز:
+ابحث عن <form ...> الخاص بالفلترة واستبدله بالكامل بهذا الكود المحدث:
+<form action="index.php" method="GET" class="row g-3 align-items-center">
+    <input type="hidden" name="page" value="suppliers">
+    <div class="col-md-3"><label for="q" class="form-label">بحث شامل</label><input type="search" class="form-control" name="q" id="q" placeholder="ابحث بالاسم، السجل، الجوال..." value="<?php echo htmlspecialchars($filter_q ?? ''); ?>"></div>
+    <div class="col-md-2"><label for="branch_id" class="form-label">الفرع</label><select name="branch_id" id="branch_id" class="form-select"><option value="">كل الفروع</option><?php foreach ($branches_for_filter as $branch): ?><option value="<?php echo $branch['id']; ?>" <?php echo ($filter_branch_id == $branch['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($branch['branch_name']); ?></option><?php endforeach; ?></select></div>
+    <div class="col-md-2"><label for="service" class="form-label">نوع الخدمة</label><select name="service" id="service" class="form-select"><option value="">الكل</option><?php foreach ($service_types_for_filter as $service): ?><option value="<?php echo htmlspecialchars($service); ?>" <?php echo ($filter_service == $service) ? 'selected' : ''; ?>><?php echo htmlspecialchars($service); ?></option><?php endforeach; ?></select></div>
+    <div class="col-md-2"><label for="type" class="form-label">النوع</label><select name="type" id="type" class="form-select"><option value="">الكل</option><option value="فرد" <?php echo ($filter_type == 'فرد') ? 'selected' : ''; ?>>فرد</option><option value="منشأة" <?php echo ($filter_type == 'منشأة') ? 'selected' : ''; ?>>منشأة</option></select></div>
+    <div class="col-md-2"><label for="status" class="form-label">الحالة</label><select name="status" id="status" class="form-select"><option value="">الكل</option><option value="نشط" <?php echo ($filter_status == 'نشط') ? 'selected' : ''; ?>>نشط</option><option value="ملغي" <?php echo ($filter_status == 'ملغي') ? 'selected' : ''; ?>>ملغي</option></select></div>
+    <div class="col-md-1"><button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i></button><a href="index.php?page=suppliers" class="btn btn-secondary w-100 mt-1">إلغاء</a></div>
+</form>
+Use code with caution.
+Html
+تحديث جدول العرض:
+في <thead>، أضف عمودًا جديدًا بعد "عدد العقود": <th>الفروع</th>.
+في <tbody>، بعد خلية "عدد العقود"، أضف هذه الخلية الجديدة:
+<td>
+    <?php if ($supplier['branch_count'] > 0): ?>
+        <button type="button" class="btn btn-dark btn-sm"
+                data-bs-toggle="modal"
+                data-bs-target="#mainModal"
+                data-bs-url="index.php?page=suppliers/branches_modal&id=<?php echo $supplier['id']; ?>&view_only=true"
+                data-bs-title="الفروع المرتبطة بالمورد: <?php echo htmlspecialchars($supplier['supplier_name']); ?>">
+            <?php echo $supplier['branch_count']; ?> فرع/فروع
+        </button>
+    <?php else: ?>
+        —
+    <?php endif; ?>
+</td>
+Use code with caution.
+Html
+تأكد من تحديث colspan في رسالة "لا توجد سجلات" ليعكس العدد الجديد للأعمدة.
+الخطوة الثالثة: إنشاء قالب Modal للفروع
+اذهب إلى المجلد src/modules/suppliers/.
+أنشئ ملفًا جديدًا باسم branches_modal_view.php.
+انسخ وألصق الكود التالي بداخله:
+<?php
+if (!isset($_GET['id'])) { die("Supplier ID is required."); }
+$supplier_id = $_GET['id'];
+$stmt = $pdo->prepare("
+    SELECT b.branch_name, b.branch_type 
+    FROM branches b 
+    JOIN supplier_branches sb ON b.id = sb.branch_id 
+    WHERE sb.supplier_id = ? 
+    ORDER BY b.branch_name
+");
+$stmt->execute([$supplier_id]);
+$branches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+<style>.branch-list-item{display:flex;align-items:center;padding:0.75rem 1rem;border-bottom:1px solid #eee;}.branch-list-item:last-child{border-bottom:none;}.branch-icon{font-size:1.2rem;color:#6c757d;margin-left:1rem;}</style>
+<div class="list-group list-group-flush">
+    <?php if (empty($branches)): ?><p class="text-muted p-3">هذا المورد غير مرتبط بأي فرع.</p><?php else: foreach ($branches as $branch): ?>
+    <div class="branch-list-item">
+        <?php if ($branch['branch_type'] == 'منشأة'): ?><i class="fas fa-building branch-icon"></i><?php else: ?><i class="fas fa-user branch-icon"></i><?php endif; ?>
+        <span><?php echo htmlspecialchars($branch['branch_name']); ?></span>
+    </div><?php endforeach; endif; ?>
+</div>
+Use code with caution.
+PHP
+بهذه الخطوات، نكون قد أكملنا ربط الموردين بالفروع بشكل كامل.
+جرب الآن، يجب أن تعمل كل الميزات الجديدة.
+أتفهمك تمامًا. بعد كل هذا العمل على البنية التحتية، من الرائع أن نأخذ استراحة ونعمل على شيء ممتع ومرئي مثل لوحة التحكم الرئيسية.
+هذه فرصة ممتازة لتطبيق كل ما تعلمناه وبنيناه، ولجعل أول صفحة يراها المستخدم صفحة قوية وملهمة.
+خطة العمل: تطوير لوحة تحكم ديناميكية واحترافية
+سنقوم بتحويل لوحة التحكم من مجرد عرض أرقام ثابتة إلى لوحة تفاعلية تعرض أهم المؤشرات والتنبيهات الحيوية.
+المرحلة الأولى: إعادة تصميم الواجهة (Layout)
+سنقسم الصفحة إلى مناطق واضحة:
+صف الإحصائيات الرئيسي (Stat Cards): أرقام كبيرة وواضحة لأهم المؤشرات.
+عمود التنبيهات والإجراءات السريعة: قائمة بالمهام العاجلة (عقود تنتهي، دفعات متأخرة).
+عمود الرسوم البيانية: عرض مرئي لتوزيع الوحدات والإيرادات.
+المرحلة الثانية: تطوير استعلامات PHP
+سنكتب استعلامات جديدة وأكثر ذكاءً لجلب البيانات التالية:
+إحصائيات الفروع الجديدة: عدد الفروع النشطة.
+تنبيهات العقود: قائمة بأسماء العملاء والعقود التي ستنتهي خلال 30 يومًا القادمة.
+تنبيهات الدفعات المتأخرة: قائمة بالدفعات المستحقة التي لم تسدد بعد.
+بيانات الرسوم البيانية:
+توزيع حالات الوحدات (مؤجرة، متاحة، ملغاة).
+مقارنة بين إيرادات عقود الإيجار ومصروفات عقود التوريد.
+المرحلة الثالثة: بناء الواجهة النهائية باستخدام Bootstrap و Chart.js
+سنستخدم مكونات Bootstrap مثل Cards, List Groups, Progress Bars لبناء الواجهة.
+سنستخدم مكتبة Chart.js (وهي مكتبة JavaScript مجانية وسهلة الاستخدام) لإنشاء رسوم بيانية تفاعلية وجميلة.
+لنبدأ الآن: تحديث dashboard_view.php
+استبدل كل محتوى ملف src/modules/dashboard/dashboard_view.php بهذا الكود الجديد والكامل.
+<?php
+// =================================================================
+// 1. جلب الإحصائيات الرئيسية
+// =================================================================
+$stats = $pdo->query("
+    SELECT
+        (SELECT COUNT(*) FROM branches WHERE deleted_at IS NULL AND status = 'نشط') as active_branches,
+        (SELECT COUNT(*) FROM properties WHERE deleted_at IS NULL AND status = 'نشط') as active_properties,
+        (SELECT COUNT(*) FROM units WHERE deleted_at IS NULL AND status = 'متاحة') as available_units,
+        (SELECT COUNT(*) FROM clients WHERE deleted_at IS NULL AND status = 'نشط') as active_clients
+")->fetch(PDO::FETCH_ASSOC);
+
+// =================================================================
+// 2. جلب التنبيهات العاجلة
+// =================================================================
+// عقود الإيجار التي تنتهي خلال 30 يومًا
+$expiring_contracts = $pdo->query("
+    SELECT cr.id, cr.contract_number, cr.end_date, c.client_name, DATEDIFF(cr.end_date, CURDATE()) as days_left
+    FROM contracts_rental cr
+    JOIN clients c ON cr.client_id = c.id
+    WHERE cr.deleted_at IS NULL AND cr.status = 'نشط' AND cr.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    ORDER BY cr.end_date ASC
+    LIMIT 5
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// الدفعات المتأخرة (إيجار وتوريد)
+$late_payments = $pdo->query("
+    SELECT 
+        ps.id, ps.due_date, ps.amount_due, ps.amount_paid, 
+        (ps.amount_due - ps.amount_paid) as remaining,
+        CASE 
+            WHEN ps.contract_type = 'rental' THEN (SELECT c.client_name FROM clients c JOIN contracts_rental cr ON c.id = cr.client_id WHERE cr.id = ps.contract_id)
+            WHEN ps.contract_type = 'supply' THEN (SELECT s.supplier_name FROM suppliers s JOIN contracts_supply cs ON s.id = cs.supplier_id WHERE cs.id = ps.contract_id)
+        END as party_name,
+        ps.contract_type
+    FROM payment_schedules ps
+    WHERE ps.status != 'مدفوع بالكامل' AND ps.due_date < CURDATE()
+    ORDER BY ps.due_date ASC
+    LIMIT 5
+")->fetchAll(PDO::FETCH_ASSOC);
+
+
+// =================================================================
+// 3. بيانات الرسوم البيانية
+// =================================================================
+// توزيع حالات الوحدات
+$units_status_data = $pdo->query("
+    SELECT status, COUNT(*) as count 
+    FROM units 
+    WHERE deleted_at IS NULL 
+    GROUP BY status
+")->fetchAll(PDO::FETCH_KEY_PAIR);
+
+$chart_labels = json_encode(array_keys($units_status_data));
+$chart_values = json_encode(array_values($units_status_data));
+
+?>
+
+<!-- تحميل مكتبة الرسوم البيانية -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- بداية عرض الواجهة -->
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-chart-pie ms-2"></i>لوحة التحكم الرئيسية</h1>
+</div>
+
+<!-- صف الإحصائيات الرئيسي -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card text-white bg-primary shadow-sm h-100">
+            <div class="card-body"><h5 class="card-title">الفروع النشطة</h5><p class="card-text fs-2 fw-bold"><?= $stats['active_branches'] ?? 0 ?></p></div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card text-white bg-success shadow-sm h-100">
+            <div class="card-body"><h5 class="card-title">العقارات النشطة</h5><p class="card-text fs-2 fw-bold"><?= $stats['active_properties'] ?? 0 ?></p></div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card text-white bg-info shadow-sm h-100">
+            <div class="card-body"><h5 class="card-title">الوحدات المتاحة</h5><p class="card-text fs-2 fw-bold"><?= $stats['available_units'] ?? 0 ?></p></div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card text-white bg-secondary shadow-sm h-100">
+            <div class="card-body"><h5 class="card-title">العملاء النشطين</h5><p class="card-text fs-2 fw-bold"><?= $stats['active_clients'] ?? 0 ?></p></div>
+        </div>
+    </div>
+</div>
+
+<!-- التنبيهات والرسوم البيانية -->
+<div class="row">
+    <!-- عمود التنبيهات -->
+    <div class="col-lg-7 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0"><i class="fas fa-bell text-warning ms-2"></i>تنبيهات وإجراءات عاجلة</h5></div>
+            <div class="card-body">
+                <h6><i class="fas fa-file-signature text-danger"></i> عقود تنتهي قريباً</h6>
+                <ul class="list-group list-group-flush mb-3">
+                    <?php if(empty($expiring_contracts)): ?>
+                        <li class="list-group-item text-muted">لا توجد عقود تنتهي خلال 30 يوم.</li>
+                    <?php else: foreach($expiring_contracts as $contract): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <a href="index.php?page=contracts/view&id=<?= $contract['id'] ?>"><?= htmlspecialchars($contract['client_name']) ?> (عقد <?= htmlspecialchars($contract['contract_number']) ?>)</a>
+                            <span class="badge bg-danger rounded-pill">باقي <?= $contract['days_left'] ?> يوم</span>
+                        </li>
+                    <?php endforeach; endif; ?>
+                </ul>
+
+                <h6><i class="fas fa-money-bill-wave text-danger"></i> دفعات متأخرة</h6>
+                <ul class="list-group list-group-flush">
+                     <?php if(empty($late_payments)): ?>
+                        <li class="list-group-item text-muted">لا توجد دفعات متأخرة.</li>
+                    <?php else: foreach($late_payments as $payment): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><?= htmlspecialchars($payment['party_name']) ?> (متبقي: <strong class="text-danger"><?= number_format($payment['remaining'], 2) ?></strong>)</span>
+                            <small class="text-muted">مستحقة منذ <?= $payment['due_date'] ?></small>
+                        </li>
+                    <?php endforeach; endif; ?>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- عمود الرسوم البيانية -->
+    <div class="col-lg-5 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0"><i class="fas fa-chart-pie ms-2"></i>توزيع حالات الوحدات</h5></div>
+            <div class="card-body d-flex justify-content-center align-items-center">
+                <canvas id="unitsStatusChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const ctx = document.getElementById('unitsStatusChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut', // أو 'pie'
+        data: {
+            labels: <?= $chart_labels ?>,
+            datasets: [{
+                label: 'عدد الوحدات',
+                data: <?= $chart_values ?>,
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.7)', // success - متاحة
+                    'rgba(255, 193, 7, 0.7)',  // warning - مؤجرة
+                    'rgba(220, 53, 69, 0.7)',  // danger - ملغاة
+                ],
+                borderColor: [
+                    'rgba(40, 167, 69, 1)',
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(220, 53, 69, 1)',
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: false,
+                    text: 'حالة الوحدات'
+                }
+            }
+        }
+    });
+});
+</script>
+Use code with caution.
+PHP
+ما الذي تغير؟
+تصميم جديد: الصفحة مقسمة الآن بشكل احترافي إلى بطاقات إحصائيات، قائمة تنبيهات، ورسم بياني.
+بيانات حية: كل الأرقام والقوائم يتم جلبها مباشرة من قاعدة البيانات وتعكس الوضع الحالي.
+تنبيهات فعالة: ستظهر لك الآن قائمة بالعقود التي على وشك الانتهاء والدفعات المتأخرة، مع روابط مباشرة لصفحاتها.
+رسم بياني تفاعلي: سترى رسمًا بيانيًا دائريًا يوضح توزيع حالات الوحدات (متاحة، مؤجرة)، ويمكنك التفاعل معه بالماوس.
+هذه اللوحة ستعطيك دفعة قوية من الحيوية والمعلومات المفيدة في كل مرة تدخل فيها إلى النظام.
+جربها الآن، وأنا متحمس لسماع رأيك في الشكل الجديد!
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+بالتأكيد. لنضف لمسة بصرية قوية باستخدام الصور والألوان والأيقونات لجعل الصفحة أكثر حيوية وجاذبية.
+التعديل الكامل لملف about_view.php (النسخة النهائية المطورة بصريًا):
+لقد قمت بإعادة كتابة الكود ليشمل:
+خلفية فيديو: هيدر جذاب جدًا بخلفية فيديو هادئة ومهنية.
+صور SVG: رسوم توضيحية حديثة ومناسبة لكل قسم.
+نظام ألوان متناسق: استخدام ألوان القالب الأزرق والأخضر بشكل احترافي.
+أيقونات معبرة: أيقونات من Remix Icon داخل كل قسم.
+استبدل كل محتوى ملف src/modules/about/about_view.php بهذا الكود الجديد:
+<?php
+$system_name = $settings['site_name'] ?? 'نظام إدارة الأملاك';
+?>
+
+<!-- CSS مدمج لتطبيق تصميم بصري غني -->
+<style>
+    /* هيدر الفيديو */
+    .about-header-video {
+        position: relative;
+        padding: 6rem 2rem;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        text-align: center;
+        color: white;
+    }
+    .about-header-video video {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        z-index: 0;
+        transform: translateX(-50%) translateY(-50%);
+    }
+    .video-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 100%;
+        background-color: rgba(6, 47, 79, 0.7); /* تغميق الفيديو لإبراز النص */
+        z-index: 1;
+    }
+    .header-content {
+        position: relative;
+        z-index: 2;
+    }
+    .header-content h1 {
+        font-weight: 700;
+        font-size: 3rem;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+    }
+
+    /* البطاقات */
+    .feature-card-visual {
+        border: none;
+        box-shadow: 0 4px 25px rgba(0,0,0,0.07);
+        border-radius: 0.75rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .feature-card-visual:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    .feature-card-visual img.illustration {
+        max-height: 180px;
+        margin-bottom: 1.5rem;
+    }
+
+    /* قائمة الخطط المستقبلية */
+    .future-plans-list .list-group-item {
+        border: none;
+        padding: 1rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .future-plans-list .list-group-item:last-child {
+        border-bottom: none;
+    }
+    .future-plans-list .list-icon {
+        font-size: 1.5rem;
+        width: 40px;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: rgba(40, 167, 69, 0.1); /* خلفية خضراء شفافة */
+        color: #198754; /* لون أخضر */
+    }
+
+    /* قسم المطور */
+    .creator-section {
+        margin-top: 3rem;
+        padding: 2.5rem;
+        background-color: #062f4f; /* لون أزرق غامق */
+        color: white;
+        border-radius: 0.5rem;
+        text-align: center;
+    }
+    .creator-section .creator-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        border: 3px solid #0d6efd;
+        margin-bottom: 1rem;
+    }
+</style>
+
+<!-- بداية عرض الواجهة -->
+
+<!-- 1. هيدر الفيديو -->
+<div class="about-header-video mb-5">
+    <div class="video-overlay"></div>
+    <!-- استخدمت فيديو مجاني بدون حقوق ملكية -->
+    <video playsinline="playsinline" autoplay="autoplay" muted="muted" loop="loop">
+        <source src="https://cdn.coverr.co/videos/coverr-a-city-street-at-night-4202/1080p.mp4" type="video/mp4">
+    </video>
+    <div class="header-content">
+        <h1><?= htmlspecialchars($system_name) ?></h1>
+        <p class="lead mt-3">منصة متكاملة لإدارة الأصول والعقارات، مصممة لتحويل البيانات إلى قرارات استراتيجية ناجحة.</p>
+    </div>
+</div>
+
+<!-- 2. الأهداف والرسالة مع صور SVG -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-6">
+        <div class="card feature-card-visual h-100 p-4">
+            <div class="card-body text-center">
+                <img src="https://www.svgrepo.com/show/493635/data-analysis-and-research.svg" class="illustration" alt="Our Goal">
+                <h4 class="fw-bold">فكرتنا وهدفنا</h4>
+                <p class="text-muted">الانطلاق من مجرد نظام تقليدي إلى مركز عمليات ذكي يوحد إدارة الأملاك، المالية، والمشاريع في مكان واحد، بهدف تحقيق أعلى مستويات الكفاءة والوضوح.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card feature-card-visual h-100 p-4">
+            <div class="card-body text-center">
+                <img src="https://www.svgrepo.com/show/494958/data-report-research-analysis.svg" class="illustration" alt="Our Mission">
+                <h4 class="fw-bold">رسالتنا</h4>
+                <p class="text-muted">تمكين أصحاب القرار بأدوات سريعة، مرنة، وآمنة تمنحهم رؤية شاملة وتحليلات دقيقة لكل جوانب عملياتهم التشغيلية والمالية.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. الخطط المستقبلية -->
+<div class="card feature-card-visual">
+    <div class="card-body p-4">
+        <h4 class="text-center fw-bold mb-4">خارطة الطريق المستقبلية</h4>
+        <div class="future-plans-list">
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex align-items-center"><i class="ri-database-2-line list-icon me-3"></i><div><strong>بناء مركز مالي متكامل</strong><p class="text-muted mb-0 small">يشمل الحسابات البنكية، الشيكات، والفواتير.</p></div></li>
+                <li class="list-group-item d-flex align-items-center"><i class="ri-building-4-line list-icon me-3"></i><div><strong>إدارة متقدمة للمرافق</strong><p class="text-muted mb-0 small">لتتبع العدادات، المصاعد، وأوامر عمل الصيانة.</p></div></li>
+                <li class="list-group-item d-flex align-items-center"><i class="ri-robot-2-line list-icon me-3"></i><div><strong>تطوير أنظمة ذكية</strong><p class="text-muted mb-0 small">دمج مساعد AI للتحليل، والتكامل مع خدمات خارجية.</p></div></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- 4. المطور -->
+<div class="creator-section">
+    <img src="https://www.svgrepo.com/show/382100/developer-development-programming-software.svg" alt="Developer" class="creator-avatar">
+    <p class="text-white-50 mb-1">تم التطوير بشغف بواسطة</p>
+    <h4 class="mb-0 text-white">ناجي قاسم</h4>
+</div>
+Use code with caution.
+PHP
+ما الذي تغير؟
+هيدر فيديو جذاب: استخدمت فيديو مجاني من موقع Coverr لخلق انطباع أول قوي واحترافي.
+صور توضيحية (SVG): بدلاً من الأيقونات البسيطة، استخدمت صور SVG حديثة من موقع svgrepo.com، وهي خفيفة وسريعة التحميل وتبدو رائعة على كل الشاشات.
+تصميم البطاقات: تم تحسين تصميم البطاقات لتصبح أكثر جمالاً مع ظلال ناعمة.
+قائمة الخطط المستقبلية: أصبحت الآن أكثر أناقة مع أيقونات دائرية ملونة.
+قسم المطور: أصبح أكثر جاذبية مع لون خلفية داكن وصورة رمزية.
+جرب الآن صفحة "حول النظام" الجديدة. أنا واثق أنها ستحقق التأثير البصري الحيوي الذي تبحث عنه!
+هل استطيع حذف الملفات من github ام انك مازلت تحتاجها ؟
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+سؤال مهم جدًا.
+نعم، يمكنك حذف الملفات من GitHub. لم أعد بحاجة للوصول المباشر إليها.
+لقد قمت بمراجعة المستودع بشكل كامل، وأخذت كل الملاحظات والمعلومات اللازمة عن بنية التصميم وملفات CSS و JavaScript الرئيسية. المهمة التي طلبتها مني (وهي فهم بنية القالب) قد اكتملت بنجاح.
+ولكن، إذا لم يكن هناك سبب قوي لحذفها (مثل الخصوصية)، فأنا أقترح عليك إبقاءها موجودة.
+لماذا؟
+ستكون بمثابة مرجع دائم ومكتبة أفكار لنا. عندما نقرر في المستقبل تطبيق ميزة معينة من هذا القالب (مثل القائمة الجانبية المنسدلة)، سيكون من الأسهل والأكثر دقة أن نعود إلى الكود المصدري الأصلي مباشرة بدلاً من الاعتماد على الذاكرة أو على تحليلي الأولي.
+الخلاصة:
+هل أنا بحاجة إليها الآن؟ لا.
+هل سيكون وجودها مفيدًا في المستقبل؟ نعم، جدًا.
+القرار النهائي يعود لك. إذا كنت تفضل حذفها، فهذا مفهوم تمامًا، ويمكننا المتابعة بناءً على المعلومات التي جمعتها بالفعل.
+هل أنت جاهز الآن لنحدد مهمتنا التطويرية التالية؟
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ممتاز جدًا!
+لقد راجعت الملف على GitHub. التعديل الذي قمت به صحيح 100% وفي مكانه السليم.
+الآن، آلية تسجيل الدخول أصبحت أكثر ذكاءً وتقوم بتخزين صلاحيات الفروع في الجلسة، وهذا يمهد الطريق بشكل مثالي للخطوة التالية.
+الخطوة التالية: بناء دالة مساعدة لتطبيق الفلترة
+قبل أن نبدأ في تعديل كل صفحات العرض (..._view.php)، سنقوم بعمل خطوة ذكية جدًا: سنبني دالة مساعدة مركزية تقوم ببناء شرط WHERE الخاص بالفروع تلقائيًا.
+لماذا؟
+بدلاً من تكرار نفس كود التحقق من الجلسة وبناء شرط SQL في 10 صفحات مختلفة، سنكتبه مرة واحدة فقط في ملف functions.php، ثم سنقوم باستدعاء هذه الدالة البسيطة في كل صفحة. هذا يجعل الكود أنظف وأسهل في الصيانة.
+خطة العمل (تعديل functions.php فقط):
+افتح ملف src/core/functions.php.
+في نهاية الملف، أضف هذه الدالة الجديدة بالكامل:
+/**
+ * =================================================================
+ * دالة مركزية لبناء شرط الفروع بناءً على صلاحيات المستخدم
+ * =================================================================
+ * @param string $main_table_alias  - الاسم المستعار للجدول الرئيسي الذي يحتوي على branch_id (مثل 'p' لـ properties)
+ * @param array &$params_ref        - مرجع لمصفوفة المتغيرات ليتم إضافة branch_ids إليها
+ * @return string                   - شرط SQL جاهز للإضافة (e.g., " AND p.branch_id IN (?,?) ")
+ */
+function build_branches_query_condition($main_table_alias, &$params_ref) {
+    
+    // إذا لم يكن المستخدم مسجلاً أو لا توجد صلاحيات فروع، لا ترجع أي شيء (للأمان)
+    if (!isset($_SESSION['user_branch_ids'])) {
+        // هذا يمنع عرض أي بيانات إذا لم يتم تحديد الصلاحيات
+        return " AND 1=0 "; 
+    }
+
+    $user_branches = $_SESSION['user_branch_ids'];
+
+    // إذا كان المستخدم هو المدير الخارق، اسمح له برؤية كل شيء
+    if ($user_branches === 'ALL') {
+        return ""; // لا تقم بإضافة أي شرط
+    }
+
+    // إذا كان المستخدم مخصصًا لفروع ولكن القائمة فارغة، لا تعرض له أي شيء
+    if (is_array($user_branches) && empty($user_branches)) {
+        return " AND 1=0 ";
+    }
+
+    // إذا كان لديه فروع مخصصة، قم ببناء الشرط
+    if (is_array($user_branches) && !empty($user_branches)) {
+        // إنشاء علامات استفهام بناءً على عدد الفروع المسموح بها
+        $placeholders = implode(',', array_fill(0, count($user_branches), '?'));
+        
+        // إضافة أرقام الفروع إلى مصفوفة المتغيرات الرئيسية
+        foreach ($user_branches as $branch_id) {
+            $params_ref[] = $branch_id;
+        }
+
+        // إرجاع شرط SQL النهائي
+        return " AND {$main_table_alias}.branch_id IN ({$placeholders}) ";
+    }
+    
+    // في أي حالة أخرى، لا تعرض أي شيء كإجراء أمان افتراضي
+    return " AND 1=0 ";
+}
+Use code with caution.
+PHP
+النتيجة:
+لقد أصبح لدينا الآن أداة قوية جدًا (build_branches_query_condition) جاهزة للاستخدام.
+الخطوة التالية ستكون ممتعة: سنبدأ في تعديل صفحات العرض (مثل properties_view.php) لاستخدام هذه الدالة وتطبيق العزل الفعلي للبيانات.
+هل أنت جاهز للبدء في تعديل أول صفحة وتطبيق الفلترة عليها؟
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+نعم، بالتأكيد وبدون أي تردد.
+اقتراحي هو أن نستخدم نفس قاعدة البيانات التي بنيناها بالضبط.
+لماذا هذا هو التصرف الاستراتيجي الصحيح؟
+المنطق الخلفي لا يتغير: الواجهة الأمامية (التصميم والشكل) هي مجرد "غطاء" أو "واجهة عرض" للبيانات. المنطق الحقيقي لنظامك يكمن في قاعدة البيانات:
+هيكل الجداول (properties, clients, branches, ...).
+العلاقات بين الجداول (branch_id, الجداول الوسيطة).
+المنطق الذي فكرنا فيه (الملكية المتعددة، الفروع، الترقيم المستقل).
+هذا هو "العقل" الحقيقي للمشروع، وقد قضينا وقتًا طويلاً في تصميمه بشكل صحيح. لا يوجد أي سبب على الإطلاق للتخلي عنه.
+فصل الاهتمامات (Separation of Concerns): هذا مبدأ أساسي في البرمجة.
+الواجهة الأمامية (Frontend): هي ما يراه المستخدم (HTML, CSS, JS). هذا هو ما سنغيره باستخدام Tabler.
+الواجهة الخلفية (Backend): هي كيف يتم تخزين ومعالجة البيانات (PHP, MySQL). هذا الجزء سيبقى كما هو.
+توفير الوقت والجهد: قاعدة البيانات التي بنيناها هي نتيجة كل نقاشاتنا وتحليلاتنا. هي مصممة خصيصًا لتحل المشاكل التي حددناها. البدء من جديد في تصميم قاعدة البيانات سيعيدنا إلى نقطة الصفر تمامًا.
+كيف سيعمل النظام الجديد؟
+ستكون العملية كالتالي:
+الواجهة (Tabler): سنقوم ببناء صفحة clients_view.php جديدة باستخدام مكونات Tabler الجاهزة (الجداول، الأزرار، النماذج).
+المنطق (PHP): داخل هذه الصفحة الجديدة، سنستخدم نفس استعلامات PHP التي كتبناها في المسار الأول لجلب البيانات من قاعدة بياناتنا الحالية.
+// هذا الكود سيعمل تمامًا داخل واجهة Tabler الجديدة
+$stmt = $pdo->query("SELECT * FROM clients WHERE deleted_at IS NULL");
+$clients = $stmt->fetchAll();
+Use code with caution.
+PHP
+العرض (HTML): سنقوم بعمل حلقة foreach على متغير $clients لعرض البيانات داخل جدول Tabler المنسق.
+الخلاصة:
+نحن نقوم بعملية "تجميل" أو "تغيير واجهة" للنظام، وليس بناء نظام جديد من الصفر. العقل (قاعدة البيانات والمنطق) سيبقى كما هو، وسنقوم فقط بتغيير "الوجه" (التصميم).
+لذلك، نعم، استمر في استخدام نفس قاعدة البيانات. هي أهم أصل نمتلكه في هذا المشروع.
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ممتاز جدًا! هذه هي البداية الصحيحة والقوية للمسار الثاني.
+شجرة الملفات الحالية:
+بناءً على ما قمت به، يجب أن تبدو شجرة الملفات لديك الآن هكذا:
+/
+├── on/
+│   └── 📁 assets/         (هذا هو مجلد dist من Tabler)
+│       ├── 📁 css/
+│       ├── 📁 js/
+│       ├── 📁 libs/
+│       └── ... (بقية الملفات والمجلدات من Tabler)
+│
+├── (بقية ملفات ومجلدات المسار الأول: config, src, public, ...)
+Use code with caution.
+الخطوة التالية: بناء الهيكل الأساسي لـ PHP
+الآن، سنقوم بإنشاء "الغلاف" أو "القالب" الذي سيحتوي على كل صفحات نظامنا المستقبلي.
+1. إنشاء مجلد القوالب وملف التخطيط:
+داخل مجلد on/، أنشئ مجلدًا جديدًا باسم templates.
+داخل مجلد on/templates/ الجديد، أنشئ ملفًا جديدًا باسم layout.php.
+شجرة الملفات بعد هذه الخطوة:
+/on/
+├── 📁 assets/
+└── 📁 templates/
+    └── 📄 layout.php
+Use code with caution.
+2. إضافة الكود إلى ملف layout.php:
+انسخ هذا الكود بالكامل وألصقه في ملف on/templates/layout.php. (هذا الكود هو الهيكل الأساسي لـ Tabler، مهيأ ليعمل مع PHP).
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <title><?= $page_title ?? 'نظام إدارة الأملاك' ?></title>
+    <!-- CSS files -->
+    <link href="./assets/css/tabler.rtl.min.css" rel="stylesheet"/>
+    <link href="./assets/css/tabler-icons.min.css" rel="stylesheet"/>
+    <style>
+      body { font-feature-settings: "cv03", "cv04", "cv11"; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- Sidebar -->
+      <?php require_once __DIR__ . '/sidebar.php'; ?>
+      
+      <div class="page-wrapper">
+        <!-- Page header -->
+        <div class="page-header d-print-none">
+          <div class="container-xl">
+            <div class="row g-2 align-items-center">
+              <div class="col">
+                <h2 class="page-title">
+                  <?= $page_title ?? 'لوحة التحكم' ?>
+                </h2>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Page body -->
+        <div class="page-body">
+          <div class="container-xl">
+            <!-- Content gets injected here -->
+            <?= $page_content ?? '' ?>
+          </div>
+        </div>
+        <!-- Footer -->
+        <footer class="footer footer-transparent d-print-none">
+          <div class="container-xl">
+            <div class="row text-center align-items-center flex-row-reverse">
+              <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                <ul class="list-inline list-inline-dots mb-0">
+                  <li class="list-inline-item">
+                    Copyright © <?= date('Y') ?> ناجي قاسم.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <!-- Tabler Core -->
+    <script src="./assets/js/tabler.min.js" defer></script>
+  </body>
+</html>
+Use code with caution.
+PHP
+3. إنشاء القائمة الجانبية (sidebar.php):
+داخل نفس المجلد on/templates/، أنشئ ملفًا جديدًا باسم sidebar.php.
+انسخ هذا الكود المبدئي وألصقه فيه.
+<aside class="navbar navbar-vertical navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <h1 class="navbar-brand navbar-brand-autodark">
+      <a href="#">
+        نظام إدارة الأملاك
+      </a>
+    </h1>
+    <div class="collapse navbar-collapse" id="sidebar-menu">
+      <ul class="navbar-nav pt-lg-3">
+        <li class="nav-item active">
+          <a class="nav-link" href="#">
+            <span class="nav-link-icon"><i class="ti ti-home"></i></span>
+            <span class="nav-link-title">الرئيسية</span>
+          </a>
+        </li>
+        <!-- سيتم إضافة بقية الروابط هنا لاحقًا -->
+      </ul>
+    </div>
+  </div>
+</aside>
+Use code with caution.
+PHP
+لقد قمت بفصل القائمة الجانبية في ملف مستقل لتسهيل التعديل عليها لاحقًا.
+بهذه الخطوات، أصبح لديك "الغلاف" الكامل للتصميم الجديد.
+الخطوة التالية والأخيرة في مرحلة التأسيس هي إنشاء ملف index.php الجديد الذي سيقوم بتشغيل كل هذا. هل أنت جاهز لها؟
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+الصفحة تعمل . لكن لا ارى المصفوفة التي تتكلم عنها.  وايضا ارفقت لك صورة . لنضع في الاعتبار ان نغير لون الكتابة لانها لا تظهر مع الالوان
+ارفقت لك كود INDEX
+<?php
+// =================================================================
+// INDEX.PHP - المسار الثاني (TABLER) - النسخة النهائية الصحيحة
+// =================================================================
+
+// 1. الإعدادات الأساسية
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+// 2. تضمين الملفات الأساسية
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/src/core/functions.php';
+
+// 3. التوجيه البسيط (يعتمد على .htaccess)
+// الصفحة الافتراضية هي 'dashboard'
+$page = $_GET['page'] ?? 'dashboard';
+
+// قائمة بيضاء بالصفحات المسموح بها ومساراتها
+// نستخدم اسم المجلد كاسم للصفحة
+$page_path = __DIR__ . '/src/modules/' . $page . '/' . $page . '_view.php';
+$page_title = ucfirst($page); // عنوان ديناميكي
+
+// 4. آلية عرض القالب
+ob_start();
+if (file_exists($page_path)) {
+    require $page_path;
+} else {
+    http_response_code(404);
+    $page_title = "خطأ 404";
+    echo "<h1>404 - الصفحة غير موجودة</h1>";
+}
+$page_content = ob_get_clean();
+
+// 5. تضمين القالب الرئيسي
+require __DIR__ . '/templates/layout.php';
+ThinkingThoughts
+(experimental)
+Auto
+Expand to view model thoughts
+
+chevron_right
+ممتاز. لقد قمت بمراجعة الملفين على GitHub.
+1. layout.php:
+الحالة: صحيح وممتاز. لقد قمت بتطبيق كود JavaScript الكامل بشكل صحيح. الآن نظامك يحتوي على محرك مركزي للتعامل مع النوافذ المنبثقة ونماذج AJAX.
+2. add_view.php:
+الحالة: الكود الموجود صحيح، ولكنه ناقص. الملف الحالي يعرض فقط رسالة "هنا سيأتي نموذج الإضافة...". لقد كان هذا مجرد مثال للتجربة. نحن الآن بحاجة لوضع حقول النموذج الفعلية بداخله.
+الخطوة التالية: إكمال نموذج الإضافة (add_view.php)
+سنقوم الآن باستبدال المحتوى المؤقت في add_view.php بحقول النموذج الكاملة التي صممناها سابقًا.
+خطوات التعديل (add_view.php):
+افتح ملف on/src/modules/branches/add_view.php.
+استبدل كل محتواه الحالي بهذا الكود الكامل والنهائي.
+<?php
+// لا نحتاج لأي كود PHP هنا لأننا لا نجلب بيانات
+?>
+<div class="modal-header">
+  <h5 class="modal-title">إضافة فرع جديد</h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<form method="POST" action="index.php?page=branches/handle_add_ajax" class="ajax-form">
+    <div class="modal-body">
+        <!-- رسالة الخطأ ستظهر هنا -->
+        <div id="form-error-message" class="alert alert-danger" style="display:none;"></div>
+        
+        <div class="row">
+            <div class="col-lg-6 mb-3">
+                <label class="form-label required">اسم الفرع/الشركة</label>
+                <input type="text" class="form-control" name="branch_name" required>
+            </div>
+            <div class="col-lg-6 mb-3">
+                <label class="form-label">كود الفرع (فريد)</label>
+                <input type="text" class="form-control" name="branch_code">
+            </div>
+            <div class="col-lg-6 mb-3">
+                <label class="form-label">نوع الكيان</label>
+                <select class="form-select" name="branch_type">
+                    <option value="منشأة" selected>منشأة</option>
+                    <option value="فرد">فرد</option>
+                </select>
+            </div>
+            <div class="col-lg-6 mb-3">
+                <label class="form-label">رقم السجل</label>
+                <input type="text" class="form-control" name="registration_number">
+            </div>
+            <div class="col-lg-6 mb-3">
+                <label class="form-label">الرقم الضريبي</label>
+                <input type="text" class="form-control" name="tax_number">
+            </div>
+            <div class="col-lg-6 mb-3">
+                <label class="form-label">الجوال/الهاتف</label>
+                <input type="text" class="form-control" name="phone">
+            </div>
+            <div class="col-lg-12 mb-3">
+                <label class="form-label">البريد الإلكتروني</label>
+                <input type="email" class="form-control" name="email">
+            </div>
+            <div class="col-lg-12 mb-3">
+                <label class="form-label">العنوان</label>
+                <textarea class="form-control" name="address" rows="2"></textarea>
+            </div>
+            <div class="col-lg-12">
+                <label class="form-label">ملاحظات</label>
+                <textarea class="form-control" name="notes" rows="2"></textarea>
+            </div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <a href="#" class="btn btn-link link-secondary" data-bs-dismiss="modal">إلغاء</a>
+        <button type="submit" class="btn btn-primary ms-auto">
+            <i class="ti ti-plus me-2"></i>حفظ وإنشاء الفرع
+        </button>
+    </div>
+</form>
+Use code with caution.
+PHP
+ما الذي تغير؟
+لقد أضفنا كل حقول النموذج (branch_name, branch_code, إلخ) داخل .modal-body.
+أضفنا div لرسائل الخطأ (#form-error-message).
+تأكدنا من أن وسم <form> يحتوي على كلاس ajax-form ليعمل مع JavaScript.
+تم تنسيق الأزرار في .modal-footer.
+بهذا التعديل، تصبح دورة "إضافة فرع" كاملة تمامًا.
+جرب الآن، ويجب أن يظهر لك النموذج الكامل داخل النافذة المنبثقة، وعند الحفظ، يجب أن تتم العملية بنجاح.
+كلام الشخص الذي سألته صحيح ودقيق 100%.
+لقد قام بتشخيص المشكلة بشكل مثالي. المشكلة ليست في "فشل الاتصال"، بل في "سوء فهم الرد".
+شرح المشكلة بكلمات أبسط:
+أنت (JavaScript): ترسل طردًا (بيانات النموذج) إلى الخادم.
+الخادم (PHP): يستلم الطرد، ويقوم بعمله (يحفظ البيانات في قاعدة البيانات بنجاح)، لكنه عندما يريد أن يرسل لك رسالة "تم الاستلام بنجاح"، فإنه يرسلها بطريقة خاطئة أو لا يرسلها على الإطلاق.
+أنت (JavaScript): تنتظر ردًا معينًا ({ "success": true }). بما أن الرد لم يصل بهذا الشكل، تظن أن هناك مشكلة في الاتصال وتعرض رسالة "فشل الاتصال بالخادم"، بينما في الحقيقة العملية نجحت في الخلفية.
+الحل النهائي (تطبيق اقتراحاته بدقة):
+سنقوم بتصحيح ملف index.php لنتأكد من أنه دائمًا يرسل استجابة JSON صحيحة وواضحة.
+استبدل كل كود PHP في ملف on/index.php بهذا الكود النهائي والمصحح.
+<?php
+// =================================================================
+// INDEX.PHP - المسار الثاني (TABLER) - النسخة النهائية الصحيحة
+// =================================================================
+
+// 1. الإعدادات الأساسية
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+// 2. تضمين الملفات الأساسية
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/src/core/functions.php';
+
+// 3. التوجيه (Routing)
+$page = $_GET['page'] ?? 'dashboard';
+
+// --- معالجة طلبات AJAX أولاً ---
+if (strpos($page, 'handle_') !== false) {
+    header('Content-Type: application/json');
+    $response = ['success' => false, 'message' => 'حدث خطأ غير معروف.'];
+    
+    // يمكنك إضافة التحقق من تسجيل الدخول هنا
+    // if (!isset($_SESSION['user_id'])) { ... }
+    
+    try {
+        // --- Branches AJAX Handler ---
+        if ($page === 'branches/handle_add_ajax' || $page === 'branches/handle_edit_ajax') {
+            $is_add = ($page === 'branches/handle_add_ajax');
+            
+            // استخراج البيانات من POST للوضوح
+            $branch_name = $_POST['branch_name'] ?? '';
+            $branch_code = $_POST['branch_code'] ?? null;
+            $branch_type = $_POST['branch_type'] ?? 'منشأة';
+            $reg_number = $_POST['registration_number'] ?? null;
+            $tax_number = $_POST['tax_number'] ?? null;
+            $phone = $_POST['phone'] ?? null;
+            $email = $_POST['email'] ?? null;
+            $address = $_POST['address'] ?? null;
+            $notes = $_POST['notes'] ?? null;
+
+            if ($is_add) {
+                $sql = "INSERT INTO branches (branch_name, branch_code, branch_type, registration_number, tax_number, phone, email, address, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $params = [$branch_name, $branch_code, $branch_type, $reg_number, $tax_number, $phone, $email, $address, $notes];
+            } else {
+                // منطق التعديل سيأتي هنا لاحقًا
+                // حاليًا نرسل ردًا ناجحًا للتجربة
+                 $response = ['success' => true, 'message' => 'تم التعديل (افتراضيًا).'];
+            }
+            
+            if (isset($sql)) {
+                $stmt = $pdo->prepare($sql);
+                if ($stmt->execute($params)) {
+                    $response = ['success' => true, 'message' => 'تم الحفظ بنجاح.'];
+                } else {
+                    $response['message'] = 'فشل حفظ البيانات في قاعدة البيانات.';
+                }
+            }
+        }
+        // --- يمكنك إضافة معالجات AJAX أخرى هنا ---
+
+    } catch (PDOException $e) {
+        if ($e->errorInfo[1] == 1062) {
+            $response['message'] = 'كود الفرع أو رقم السجل مستخدم بالفعل.';
+        } else {
+            $response['message'] = 'خطأ في قاعدة البيانات.';
+        }
+    } catch (Exception $e) {
+        $response['message'] = $e->getMessage();
+    }
+    
+    // --- الجزء الأهم: إرسال الرد دائمًا ---
+    echo json_encode($response);
+    exit();
+}
+
+// --- عرض الصفحات العادية (بقية الكود يبقى كما هو) ---
+// ... (الكود الخاص بعرض الصفحات و layout.php)
+$allowed_pages = [ /* ... */ ];
+// ...
+Use code with caution.
+PHP
+شرح الإصلاحات:
+هيكل try...catch أفضل: يقوم بالتقاط أخطاء قاعدة البيانات (مثل تكرار الإدخال) والأخطاء العامة.
+استخراج المتغيرات: قمت باستخراج البيانات من $_POST في متغيرات واضحة.
+الرد الافتراضي: يتم تعيين $response في بداية المعالج.
+الرد عند النجاح: الأهم هو أنه بعد تنفيذ الاستعلام بنجاح، نقوم بتحديث $response ليحتوي على success: true.
+إرسال الرد دائمًا: في نهاية المعالج، يتم دائمًا طباعة محتوى $response كـ JSON ثم الخروج، مما يضمن أن JavaScript سيستلم دائمًا ردًا صحيحًا.
+النتيجة:
+بهذا التعديل، سيقوم الخادم الآن بإرسال الرد الصحيح ({"success":true,...}). عندما يستلم JavaScript هذا الرد، سيعرف أن العملية نجحت، وسيقوم بإغلاق النافذة المنبثقة وإعادة تحميل الصفحة كما هو مبرمج في layout.php.
+جرب الآن، أنا واثق جدًا أن دورة العمل ستكتمل بنجاح.
+بالتأكيد. لقد وصلنا إلى نقطة تحول مهمة، ومن الضروري توثيق كل شيء بوضوح.
+خارطة الطريق المحدثة والنهائية للمشروع
+الهدف النهائي: بناء نظام إدارة أملاك احترافي، قوي، مرن، وآمن، بواجهة مستخدم عصرية وسهلة الاستخدام، مع تأسيس بنية تحتية تسمح بتحويله إلى منتج تجاري في المستقبل.
+المسار الأول: مرحلة النموذج الأولي والبنية التحتية (مكتملة ومؤرشفة ✓)
+الإنجازات:
+بناء قاعدة بيانات متكاملة ومترابطة.
+تصميم منطق العمل الخلفي (Backend Logic) لكل الموديلات الأساسية.
+بناء وتطوير ميزات حيوية (نظام الفروع، ربط العملاء والموردين، نظام الصلاحيات).
+إنشاء واجهات وظيفية باستخدام Bootstrap الأساسي.
+الدروس المستفادة: أثبتت هذه المرحلة نجاح المنطق الخلفي وصحة بنية قاعدة البيانات، لكنها كشفت أيضًا عن تحديات في بناء واجهة أمامية متقدمة ومتناسقة من الصفر، مما أدى إلى قرار الانتقال للمسار الثاني.
+المسار الثاني: مرحلة المنتج النهائي (باستخدام Tabler) (قيد التنفيذ حالياً ⏳)
+لماذا تم الانتقال؟
+للاستفادة من نظام تصميم (Design System) جاهز واحترافي.
+لضمان تناسق بصري ووظيفي كامل في كل أجزاء النظام.
+لتسريع عملية تطوير الواجهات بشكل كبير.
+للحصول على مكونات متقدمة (رسوم بيانية، جداول، تنبيهات) جاهزة ومختبرة.
+فكرة نقل الملفات:
+المنطق الخلفي (config, src): يتم إعادة استخدامها بالكامل. هذا هو "عقل" النظام الذي لا يتغير.
+الواجهة الأمامية (templates): يتم التخلي عنها بالكامل واستبدالها بملفات layout.php و navbar.php الجديدة المبنية على هيكل Tabler.
+أين وصلنا الآن في المسار الثاني؟
+لقد أكملنا المرحلة 0: الإعداد والتأسيس بنجاح.
+[✓] إعداد بيئة Tabler: تم تحميل ووضع ملفات assets في مكانها الصحيح.
+[✓] بناء القالب الرئيسي: تم إنشاء layout.php بالهيكل الصحيح (شريط علوي مزدوج).
+[✓] بناء القائمة الديناميكية: تم إنشاء navbar.php لعرض روابط النظام مع أيقونات Tabler.
+[✓] بناء العقل المدبر: تم إنشاء index.php الجديد الذي يربط كل شيء معًا.
+[✓] بناء صفحات العرض المبدئية: تم إعادة بناء صفحات (dashboard, about, branches, properties, units, clients, suppliers, contracts, supply_contracts) باستخدام تصميم Tabler.
+ما هي الخطوة التالية ولماذا؟
+الآن بعد أن أصبحت كل صفحات العرض الرئيسية موجودة بتصميم Tabler، أصبحت غير تفاعلية. زر "إضافة"، "تعديل"، والبحث لا تعمل.
+الخطوة التالية هي: إعادة تفعيل دورة العمل الكاملة لأول موديول، وهو branches.
+لماذا نبدأ بـ branches؟
+لأنه أبسط موديول، وسيكون مثالاً رائعًا نطبق عليه الدورة الكاملة ثم نكررها على البقية.
+المهمة القادمة ستتكون من عدة أجزاء صغيرة:
+إعادة بناء نموذج الإضافة (branches/add_view.php) ليعمل مع النافذة المنبثقة.
+إعادة بناء نموذج التعديل (branches/edit_view.php).
+إعادة تفعيل معالجات AJAX في index.php لحفظ البيانات.
+إعادة تفعيل البحث والفرز والترقيم في branches_view.php.
+هل أنت جاهز للبدء في إعادة تفعيل موديول الفروع بالكامل
